@@ -25,8 +25,7 @@ flutter pub get
 ```
 
 ### Demo!
-
-[gif](https://github.com/zeref278/cupertino_route/raw/main/media/demo.gif)
+<img src="https://github.com/zeref278/cupertino_route/raw/main/media/demo.gif" height="500"/>
 
 ## Usage
 
