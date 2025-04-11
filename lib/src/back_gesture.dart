@@ -256,6 +256,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
     // that has the notch.
     return Listener(
       onPointerDown: (event) {
+        if (!widget.enabledCallback()) return;
         for (final context in {...horizontal}) {
           if (!context.mounted) horizontal.remove(context);
         }
@@ -268,9 +269,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
         final horizontalList = horizontal.toList()..sort((a, b) => sort(a, b));
 
         horizontalEdge = null;
-        for (final context in horizontalList) {
-          updateEdge(context, event.position);
-        }
+        updateEdge(horizontalList.last, event.localPosition);
       },
       child: RawGestureDetector(
         gestures: {
@@ -281,6 +280,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
               () => null,
               4,
               300,
+              widget.enabledCallback,
             ),
             (instance) => instance //
               ..onStart = _handleDragStart
@@ -289,41 +289,37 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
               ..onEnd = _handleDragEnd,
           ),
         },
-        child: ScrollConfiguration(
-          behavior: const _DraggableScrollBehavior(),
-          child: NotificationListener<Notification>(
-            onNotification: (notification) {
-              if (notification is ScrollMetricsNotification) {
-                if (notification.metrics.axis == Axis.horizontal) {
-                  ScrollableState? findTopMostScrollable(BuildContext context) {
-                    // Find the nearest ScrollableState ancestor
-                    final state =
-                        context.findAncestorStateOfType<ScrollableState>();
-
-                    // If no scrollable found, return null
-                    if (state == null) return null;
-
-                    // If the found scrollable's axis doesn't match the notification's axis,
-                    // keep searching up the tree
-                    if (state.position.axis != Axis.horizontal) {
-                      return findTopMostScrollable(state.context);
-                    }
-
-                    // Return the found scrollable state
-                    return state;
-                  }
-
-                  var scrollable =
-                      findTopMostScrollable(notification.context)?.context;
-                  if (scrollable != null) {
-                    horizontal.add(scrollable);
-                  }
+        child: NotificationListener<Notification>(
+          onNotification: (notification) {
+            if (notification is ScrollMetricsNotification &&
+                notification.metrics.axis == Axis.horizontal) {
+              ScrollableState? findTopMostScrollable(BuildContext context) {
+                // Find the nearest ScrollableState ancestor
+                final state =
+                    context.findAncestorStateOfType<ScrollableState>();
+        
+                // If no scrollable found, return null
+                if (state == null) return null;
+        
+                // If the found scrollable's axis doesn't match the notification's axis,
+                // keep searching up the tree
+                if (state.position.axis != Axis.horizontal) {
+                  return findTopMostScrollable(state.context);
                 }
+        
+                // Return the found scrollable state
+                return state;
               }
-              return false;
-            },
-            child: widget.child,
-          ),
+        
+              var scrollable =
+                  findTopMostScrollable(notification.context)?.context;
+              if (scrollable != null) {
+                horizontal.add(scrollable);
+              }
+            }
+            return false;
+          },
+          child: widget.child,
         ),
       ),
     );
@@ -346,6 +342,7 @@ class _DraggableScrollPhysics extends ClampingScrollPhysics {
 class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
   final ValueGetter<Edge?> horizontalEdge;
   final ValueGetter<Edge?> verticalEdge;
+  final ValueGetter<bool> enabledCallback;
 
   final double edgeSlop;
   final double defaultSlop;
@@ -355,6 +352,7 @@ class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
     this.verticalEdge,
     this.edgeSlop,
     this.defaultSlop,
+    this.enabledCallback,
   );
 
   @override
@@ -362,6 +360,7 @@ class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
     PointerDeviceKind pointerDeviceKind,
     double? deviceTouchSlop,
   ) {
+    if (!enabledCallback()) return false;
     var delta = (finalPosition.global - initialPosition.global);
 
     var xSlop = switch (horizontalEdge()) {
