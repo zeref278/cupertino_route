@@ -132,13 +132,22 @@ enum Edge {
 class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
   BackGestureController<T>? _backGestureController;
 
+  late mono.HorizontalDragGestureRecognizer _recognizer;
+
   @override
   void initState() {
     super.initState();
+    _recognizer = mono.HorizontalDragGestureRecognizer(debugOwner: this)
+      ..onStart = _handleDragStart
+      ..onUpdate = _handleDragUpdate
+      ..onEnd = _handleDragEnd
+      ..onCancel = _handleDragCancel;
   }
 
   @override
   void dispose() {
+    _recognizer.dispose();
+
     // If this is disposed during a drag, call navigator.didStopUserGesture.
     if (_backGestureController != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -249,94 +258,108 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
 
   Edge? horizontalEdge;
 
+  void _handlePointerDown(PointerDownEvent event) {
+    if (widget.enabledCallback()) {
+      _recognizer.addPointer(event);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
     // For devices with notches, the drag area needs to be larger on the side
     // that has the notch.
-    return Listener(
-      onPointerDown: (event) {
-        if (!widget.enabledCallback()) return;
-        for (final context in {...horizontal}) {
-          if (!context.mounted) horizontal.remove(context);
-        }
-
-        int sort(BuildContext a, BuildContext b) {
-          final value = (a as Element).depth.compareTo((b as Element).depth);
-          return value;
-        }
-
-        final horizontalList = horizontal.toList()..sort((a, b) => sort(a, b));
-
-        horizontalEdge = null;
-        updateEdge(horizontalList.last, event.localPosition);
-      },
-      child: RawGestureDetector(
-        gestures: {
-          _PanGestureRecognizer:
-              GestureRecognizerFactoryWithHandlers<_PanGestureRecognizer>(
-            () => _PanGestureRecognizer(
-              () => horizontalEdge,
-              () => null,
-              4,
-              300,
-              widget.enabledCallback,
-            ),
-            (instance) => instance //
-              ..onStart = _handleDragStart
-              ..onCancel = _handleDragCancel
-              ..onUpdate = _handleDragUpdate
-              ..onEnd = _handleDragEnd,
-          ),
-        },
-        child: NotificationListener<Notification>(
-          onNotification: (notification) {
-            if (notification is ScrollMetricsNotification &&
-                notification.metrics.axis == Axis.horizontal) {
-              ScrollableState? findTopMostScrollable(BuildContext context) {
-                // Find the nearest ScrollableState ancestor
-                final state =
-                    context.findAncestorStateOfType<ScrollableState>();
-        
-                // If no scrollable found, return null
-                if (state == null) return null;
-        
-                // If the found scrollable's axis doesn't match the notification's axis,
-                // keep searching up the tree
-                if (state.position.axis != Axis.horizontal) {
-                  return findTopMostScrollable(state.context);
-                }
-        
-                // Return the found scrollable state
-                return state;
-              }
-        
-              var scrollable =
-                  findTopMostScrollable(notification.context)?.context;
-              if (scrollable != null) {
-                horizontal.add(scrollable);
-              }
+    final double dragAreaWidth = switch (Directionality.of(context)) {
+      TextDirection.rtl => MediaQuery.paddingOf(context).right,
+      TextDirection.ltr => MediaQuery.paddingOf(context).left,
+    };
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Listener(
+          onPointerDown: (event) {
+            if (!widget.enabledCallback()) return;
+            for (final context in {...horizontal}) {
+              if (!context.mounted) horizontal.remove(context);
             }
-            return false;
+
+            int sort(BuildContext a, BuildContext b) {
+              final value =
+                  (a as Element).depth.compareTo((b as Element).depth);
+              return value;
+            }
+
+            final horizontalList = horizontal.toList()
+              ..sort((a, b) => sort(a, b));
+
+            horizontalEdge = null;
+            updateEdge(horizontalList.last, event.localPosition);
           },
-          child: widget.child,
+          child: RawGestureDetector(
+            gestures: {
+              _PanGestureRecognizer:
+                  GestureRecognizerFactoryWithHandlers<_PanGestureRecognizer>(
+                () => _PanGestureRecognizer(
+                  () => horizontalEdge,
+                  () => null,
+                  4,
+                  300,
+                  widget.enabledCallback,
+                ),
+                (instance) => instance //
+                  ..onStart = _handleDragStart
+                  ..onCancel = _handleDragCancel
+                  ..onUpdate = _handleDragUpdate
+                  ..onEnd = _handleDragEnd,
+              ),
+            },
+            child: NotificationListener<Notification>(
+              onNotification: (notification) {
+                if (notification is ScrollMetricsNotification &&
+                    notification.metrics.axis == Axis.horizontal) {
+                  ScrollableState? findTopMostScrollable(BuildContext context) {
+                    // Find the nearest ScrollableState ancestor
+                    final state =
+                        context.findAncestorStateOfType<ScrollableState>();
+
+                    // If no scrollable found, return null
+                    if (state == null) return null;
+
+                    // If the found scrollable's axis doesn't match the notification's axis,
+                    // keep searching up the tree
+                    if (state.position.axis != Axis.horizontal) {
+                      return findTopMostScrollable(state.context);
+                    }
+
+                    // Return the found scrollable state
+                    return state;
+                  }
+
+                  var scrollable =
+                      findTopMostScrollable(notification.context)?.context;
+                  if (scrollable != null) {
+                    horizontal.add(scrollable);
+                  }
+                }
+                return false;
+              },
+              child: widget.child,
+            ),
+          ),
         ),
-      ),
+        PositionedDirectional(
+          start: 0.0,
+          width: max(dragAreaWidth, kBackGestureWidth),
+          top: 0.0,
+          bottom: 0.0,
+          child: Listener(
+            onPointerDown: _handlePointerDown,
+            behavior: HitTestBehavior.translucent,
+          ),
+        ),
+      ],
     );
   }
-}
-
-class _DraggableScrollBehavior extends ScrollBehavior {
-  const _DraggableScrollBehavior();
-
-  @override
-  ScrollPhysics getScrollPhysics(BuildContext context) {
-    return const _DraggableScrollPhysics();
-  }
-}
-
-class _DraggableScrollPhysics extends ClampingScrollPhysics {
-  const _DraggableScrollPhysics();
 }
 
 class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
