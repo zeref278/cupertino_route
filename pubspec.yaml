@@ -1,7 +1,7 @@
 name: cupertino_route
 description: "A new Flutter project."
 version: 0.0.1
-homepage:
+homepage: https://github.com/zeref278/cupertino_route
 
 environment:
   sdk: ^3.5.3
