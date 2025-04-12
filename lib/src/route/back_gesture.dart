@@ -1,9 +1,9 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:cupertino_route/src/constants.dart';
+import 'package:cupertino_route/src/constants/constants.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:cupertino_route/src/mono_drag.dart' as mono;
+import 'package:cupertino_route/src/route/mono_drag.dart' as mono;
 import 'package:flutter/rendering.dart';
 import 'package:provider/provider.dart';
 import 'package:vector_math/vector_math_64.dart';
@@ -111,6 +111,7 @@ class BackGestureDetector<T> extends StatefulWidget {
     required this.enabledCallback,
     required this.onStartPopGesture,
     required this.child,
+    this.swipeableBuilder,
   });
 
   final Widget child;
@@ -118,6 +119,8 @@ class BackGestureDetector<T> extends StatefulWidget {
   final ValueGetter<bool> enabledCallback;
 
   final ValueGetter<BackGestureController<T>> onStartPopGesture;
+
+  final WidgetBuilder? swipeableBuilder;
 
   @override
   BackGestureDetectorState<T> createState() => BackGestureDetectorState<T>();
@@ -129,14 +132,34 @@ enum Edge {
   end;
 }
 
-class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
+enum SwipeState {
+  open,
+  close,
+}
+
+class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
+    with SingleTickerProviderStateMixin {
   BackGestureController<T>? _backGestureController;
 
   late mono.HorizontalDragGestureRecognizer _recognizer;
 
+  late final AnimationController? _swipeAnimationController;
+
+  bool _swipeOnce = false;
+
   @override
   void initState() {
     super.initState();
+    if (isSwipeable) {
+      _swipeAnimationController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 200),
+        reverseDuration: const Duration(milliseconds: 200),
+      );
+    } else {
+      _swipeAnimationController = null;
+    }
+
     _recognizer = mono.HorizontalDragGestureRecognizer(debugOwner: this)
       ..onStart = _handleDragStart
       ..onUpdate = _handleDragUpdate
@@ -162,30 +185,115 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
 
   void _handleDragStart(DragStartDetails details) {
     assert(mounted);
+    if (!widget.enabledCallback()) return;
     assert(_backGestureController == null);
+
     _backGestureController = widget.onStartPopGesture();
   }
 
+  bool get isSwipeable => widget.swipeableBuilder != null;
+
+  Offset _offset = Offset.zero;
+
+  SwipeState _swipeState = SwipeState.close;
+
   void _handleDragUpdate(DragUpdateDetails details) {
     assert(mounted);
+    if (_backGestureController == null) return;
     assert(_backGestureController != null);
-    _backGestureController!.dragUpdate(
-        _convertToLogical(details.primaryDelta! / context.size!.width));
+    final isHorizontalDrag = details.delta.dx.abs() > details.delta.dy.abs();
+    if (!isHorizontalDrag) return;
+    final bool isSwiping = isSwipeable &&
+        ((details.delta.dx < 0 ||
+            (_swipeAnimationController?.value ?? 0) != 0));
+    if (isSwiping &&
+        _backGestureController!.controller.value == 1 &&
+        _offset.dx <= 0) {
+      _offset = Offset(_offset.dx + details.delta.dx, 0);
+      final value = _offset.dx.abs() / MediaQuery.sizeOf(context).width;
+      _swipeOnce = true;
+
+      _swipeAnimationController?.value = value;
+    } else {
+      _backGestureController!.dragUpdate(
+          _convertToLogical(details.primaryDelta! / context.size!.width));
+    }
   }
 
   void _handleDragEnd(DragEndDetails details) {
     assert(mounted);
+    if (_backGestureController == null) return;
     assert(_backGestureController != null);
-    _backGestureController!.dragEnd(_convertToLogical(
-        details.velocity.pixelsPerSecond.dx / context.size!.width));
+    if (swipeAnimationValue == 0 || !isSwipeable) {
+      _backGestureController!.dragEnd(_convertToLogical(
+          details.velocity.pixelsPerSecond.dx / context.size!.width));
+    } else {
+      final velocity = _convertToLogical(
+          details.velocity.pixelsPerSecond.dx / context.size!.width);
+      if (_swipeState == SwipeState.open) {
+        /// Opening
+        if (swipeAnimationValue < 0.5 || velocity > 2) {
+          _offset = Offset.zero;
+          _swipeAnimationController?.animateTo(0);
+          _swipeState = SwipeState.close;
+        } else {
+          _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
+          _swipeAnimationController?.animateTo(1);
+          _swipeState = SwipeState.open;
+        }
+      } else {
+        /// Closing
+        if (swipeAnimationValue > 0.5 || velocity < -2) {
+          _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
+          _swipeAnimationController?.animateTo(1);
+          _swipeState = SwipeState.open;
+        } else {
+          _offset = Offset.zero;
+          _swipeAnimationController?.animateTo(0);
+          _swipeState = SwipeState.close;
+        }
+      }
+
+      _backGestureController!.dragEnd(0);
+    }
     _backGestureController = null;
   }
+
+  double get swipeAnimationValue => _swipeAnimationController?.value ?? 0;
 
   void _handleDragCancel() {
     assert(mounted);
     // This can be called even if start is not called, paired with the "down" event
     // that we don't consider here.
-    _backGestureController?.dragEnd(0.0);
+    if (swipeAnimationValue == 0 || !isSwipeable) {
+      _backGestureController?.dragEnd(0.0);
+    } else {
+      if (_swipeState == SwipeState.open) {
+        /// Opening
+        if (swipeAnimationValue < 0.5) {
+          _offset = Offset.zero;
+          _swipeAnimationController?.animateTo(0);
+          _swipeState = SwipeState.close;
+        } else {
+          _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
+          _swipeAnimationController?.animateTo(1);
+          _swipeState = SwipeState.open;
+        }
+      } else {
+        /// Closing
+        if (swipeAnimationValue < 0.5) {
+          _offset = Offset.zero;
+          _swipeAnimationController?.animateTo(0);
+          _swipeState = SwipeState.close;
+        } else {
+          _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
+          _swipeAnimationController?.animateTo(1);
+          _swipeState = SwipeState.open;
+        }
+      }
+
+      _backGestureController?.dragEnd(0);
+    }
     _backGestureController = null;
   }
 
@@ -267,12 +375,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasDirectionality(context));
-    // For devices with notches, the drag area needs to be larger on the side
-    // that has the notch.
-    final double dragAreaWidth = switch (Directionality.of(context)) {
-      TextDirection.rtl => MediaQuery.paddingOf(context).right,
-      TextDirection.ltr => MediaQuery.paddingOf(context).left,
-    };
+
     return Stack(
       fit: StackFit.passthrough,
       children: [
@@ -293,7 +396,10 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
               ..sort((a, b) => sort(a, b));
 
             horizontalEdge = null;
-            updateEdge(horizontalList.last, event.localPosition);
+
+            if (horizontalList.isNotEmpty) {
+              updateEdge(horizontalList.last, event.localPosition);
+            }
           },
           child: RawGestureDetector(
             gestures: {
@@ -343,10 +449,24 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
                 }
                 return false;
               },
-              child: widget.child,
+              child: _buildChild(),
             ),
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildChild() {
+    // For devices with notches, the drag area needs to be larger on the side
+    // that has the notch.
+    final double dragAreaWidth = switch (Directionality.of(context)) {
+      TextDirection.rtl => MediaQuery.paddingOf(context).right,
+      TextDirection.ltr => MediaQuery.paddingOf(context).left,
+    };
+    final defaultChild = Stack(
+      children: [
+        widget.child,
         PositionedDirectional(
           start: 0.0,
           width: max(dragAreaWidth, kBackGestureWidth),
@@ -359,6 +479,46 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>> {
         ),
       ],
     );
+
+    if (widget.swipeableBuilder != null) {
+      return Stack(
+        children: [
+          // Main content that should handle scrolling
+          AnimatedBuilder(
+            animation: _swipeAnimationController!,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(
+                  -(_swipeAnimationController.value) * 100,
+                  0,
+                ),
+                child: IgnorePointer(
+                  ignoring: _swipeAnimationController.value != 0,
+                  child: child,
+                ),
+              );
+            },
+            child: defaultChild,
+          ),
+          // Swipeable overlay
+          AnimatedBuilder(
+            animation: _swipeAnimationController,
+            builder: (context, child) {
+              return Transform.translate(
+                offset: Offset(
+                  (1 - _swipeAnimationController.value) *
+                      MediaQuery.sizeOf(context).width,
+                  0,
+                ),
+                child: !_swipeOnce ? const SizedBox() : child,
+              );
+            },
+            child: widget.swipeableBuilder!(context),
+          ),
+        ],
+      );
+    }
+    return defaultChild;
   }
 }
 
@@ -393,7 +553,7 @@ class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
       _ => defaultSlop,
     };
 
-    return delta.dx.abs() > xSlop;
+    return delta.dx.abs() > xSlop && delta.dy.abs() < 10;
   }
 }
 

@@ -57,6 +57,19 @@ class MyHomePage extends StatelessWidget {
               },
               child: const Text('Tab bar view'),
             ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  CupertinoRoute(
+                    builder: (context) => const HorizontalListViewScreen(),
+                    swipeableBuilder: (context) => const TabBarViewScreen(),
+                  ),
+                );
+              },
+              child: const Text('Swipeable right wrapper'),
+            ),
           ],
         ),
       ),
@@ -110,6 +123,12 @@ class _TabBarViewScreenState extends State<TabBarViewScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override

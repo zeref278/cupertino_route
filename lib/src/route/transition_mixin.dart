@@ -1,5 +1,5 @@
-import 'package:cupertino_route/src/back_gesture.dart';
-import 'package:cupertino_route/src/constants.dart';
+import 'package:cupertino_route/src/route/back_gesture.dart';
+import 'package:cupertino_route/src/constants/constants.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 
@@ -7,6 +7,18 @@ mixin TransitionMixin<T> on PageRoute<T> {
   /// Builds the primary contents of the route.
   @protected
   Widget buildContent(BuildContext context);
+
+  /// Builds the swipeable contents of the route.
+  @protected
+  WidgetBuilder? buildSwipeableContent;
+
+  /// Whether the route is swipeable.
+  @protected
+  bool get isSwipeable;
+
+  /// The controller for the swipeable route.
+  @protected
+  ValueSetter<AnimationController?>? get animationController;
 
   /// {@template flutter.cupertino.CupertinoRouteTransitionMixin.title}
   /// A title string for this route.
@@ -39,6 +51,12 @@ mixin TransitionMixin<T> on PageRoute<T> {
       'Cannot read the previousTitle for a route that has not yet been installed',
     );
     return _previousTitle!;
+  }
+
+  @override
+  void install() {
+    super.install();
+    animationController?.call(controller);
   }
 
   @override
@@ -80,8 +98,11 @@ mixin TransitionMixin<T> on PageRoute<T> {
   }
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation) {
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
     final Widget child = buildContent(context);
     return Semantics(
       scopesRoute: true,
@@ -118,7 +139,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
   ///
   ///  * [CupertinoPageTransitionsBuilder], which uses this method to define a
   ///    [PageTransitionsBuilder] for the [PageTransitionsTheme].
-  static Widget buildPageTransitions<T>(
+  Widget buildPageTransitions<T>(
     PageRoute<T> route,
     BuildContext context,
     Animation<double> animation,
@@ -146,6 +167,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
         child: BackGestureDetector<T>(
           enabledCallback: () => route.popGestureEnabled,
           onStartPopGesture: () => _startPopGesture<T>(route),
+          swipeableBuilder: buildSwipeableContent,
           child: child,
         ),
       );
