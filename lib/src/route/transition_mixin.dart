@@ -1,38 +1,24 @@
-import 'package:cupertino_route/src/back_gesture.dart';
-import 'package:cupertino_route/src/constants.dart';
+import 'package:cupertino_route/src/route/back_gesture.dart';
+import 'package:cupertino_route/src/constants/constants.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 mixin TransitionMixin<T> on PageRoute<T> {
   /// Builds the primary contents of the route.
   @protected
   Widget buildContent(BuildContext context);
 
-  /// {@template flutter.cupertino.CupertinoRouteTransitionMixin.title}
-  /// A title string for this route.
-  ///
-  /// Used to auto-populate [CupertinoNavigationBar] and
-  /// [CupertinoSliverNavigationBar]'s `middle`/`largeTitle` widgets when
-  /// one is not manually supplied.
-  /// {@endtemplate}
+  /// Builds the swipeable contents of the route.
+  @protected
+  WidgetBuilder? buildSwipeableContent;
+
   String? get title;
 
   ValueNotifier<String?>? _previousTitle;
 
-  /// The title string of the previous [CupertinoRoute].
-  ///
-  /// The [ValueListenable]'s value is readable after the route is installed
-  /// onto a [Navigator]. The [ValueListenable] will also notify its listeners
-  /// if the value changes (such as by replacing the previous route).
-  ///
-  /// The [ValueListenable] itself will be null before the route is installed.
-  /// Its content value will be null if the previous route has no title or
-  /// is not a [CupertinoRoute].
-  ///
-  /// See also:
-  ///
-  ///  * [ValueListenableBuilder], which can be used to listen and rebuild
-  ///    widgets based on a ValueListenable.
+  ScrollPhysics? get physics;
+
   ValueListenable<String?> get previousTitle {
     assert(
       _previousTitle != null,
@@ -50,9 +36,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
   @override
   void didChangePrevious(Route<dynamic>? previousRoute) {
     final String? previousTitleString =
-        previousRoute is CupertinoRouteTransitionMixin
-            ? previousRoute.title
-            : null;
+        previousRoute is TransitionMixin ? previousRoute.title : null;
     if (_previousTitle == null) {
       _previousTitle = ValueNotifier<String?>(previousTitleString);
     } else {
@@ -75,13 +59,17 @@ mixin TransitionMixin<T> on PageRoute<T> {
   @override
   bool canTransitionTo(TransitionRoute<dynamic> nextRoute) {
     // Don't perform outgoing animation if the next route is a fullscreen dialog.
-    return nextRoute is CupertinoRouteTransitionMixin &&
-        !nextRoute.fullscreenDialog;
+    return (nextRoute is TransitionMixin && !nextRoute.fullscreenDialog) ||
+        (nextRoute is CupertinoRouteTransitionMixin &&
+            !nextRoute.fullscreenDialog);
   }
 
   @override
-  Widget buildPage(BuildContext context, Animation<double> animation,
-      Animation<double> secondaryAnimation) {
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
     final Widget child = buildContent(context);
     return Semantics(
       scopesRoute: true,
@@ -90,7 +78,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
     );
   }
 
-  // Called by _CupertinoBackGestureDetector when a pop ("back") drag start
+  // Called by BackGestureDetector when a pop ("back") drag start
   // gesture is detected. The returned controller handles all of the subsequent
   // drag events.
   static BackGestureController<T> _startPopGesture<T>(PageRoute<T> route) {
@@ -118,7 +106,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
   ///
   ///  * [CupertinoPageTransitionsBuilder], which uses this method to define a
   ///    [PageTransitionsBuilder] for the [PageTransitionsTheme].
-  static Widget buildPageTransitions<T>(
+  Widget buildPageTransitions(
     PageRoute<T> route,
     BuildContext context,
     Animation<double> animation,
@@ -146,6 +134,8 @@ mixin TransitionMixin<T> on PageRoute<T> {
         child: BackGestureDetector<T>(
           enabledCallback: () => route.popGestureEnabled,
           onStartPopGesture: () => _startPopGesture<T>(route),
+          swipeableBuilder: buildSwipeableContent,
+          physics: physics,
           child: child,
         ),
       );
@@ -159,7 +149,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    return buildPageTransitions<T>(
+    return buildPageTransitions(
       this,
       context,
       animation,

@@ -12,11 +12,31 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Cupertino Route',
+      onGenerateRoute: (settings) {
+        return CupertinoRoute(
+          builder: (context) => const MyHomePage(),
+          physics: const ClampingScrollPhysics(),
+        );
+      },
+      onGenerateInitialRoutes: (settings) {
+        return [
+          CupertinoRoute(
+            builder: (context) => const MyHomePage(),
+            physics: const ClampingScrollPhysics(),
+          )
+        ];
+      },
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: {
+            for (final platform in TargetPlatform.values)
+              platform: const CupertinoPageTransitionsBuilder(),
+          },
+        ),
       ),
-      home: const MyHomePage(),
+      // home: ,
     );
   }
 }
@@ -40,6 +60,7 @@ class MyHomePage extends StatelessWidget {
                   context,
                   CupertinoRoute(
                     builder: (context) => const HorizontalListViewScreen(),
+                    physics: const ClampingScrollPhysics(),
                   ),
                 );
               },
@@ -52,10 +73,39 @@ class MyHomePage extends StatelessWidget {
                   context,
                   CupertinoRoute(
                     builder: (context) => const TabBarViewScreen(),
+                    physics: const ClampingScrollPhysics(),
                   ),
                 );
               },
               child: const Text('Tab bar view'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  CupertinoRoute(
+                    builder: (context) => const PageViewScreen(),
+                    swipeableBuilder: (context) => const EmptyScreen(),
+                    physics: const ClampingScrollPhysics(),
+                  ),
+                );
+              },
+              child: const Text('Page view'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  CupertinoRoute(
+                    builder: (context) => const HorizontalListViewScreen(),
+                    swipeableBuilder: (context) => const EmptyScreen(),
+                    physics: const ClampingScrollPhysics(),
+                  ),
+                );
+              },
+              child: const Text('Swipeable right route'),
             ),
           ],
         ),
@@ -113,6 +163,12 @@ class _TabBarViewScreenState extends State<TabBarViewScreen>
   }
 
   @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -145,6 +201,54 @@ class _TabBarViewScreenState extends State<TabBarViewScreen>
             ),
           )
         ],
+      ),
+    );
+  }
+}
+
+class EmptyScreen extends StatelessWidget {
+  const EmptyScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: Center(
+        child: Text('Empty screen'),
+      ),
+    );
+  }
+}
+
+class PageViewScreen extends StatelessWidget {
+  const PageViewScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              height: 200,
+              color: Colors.black,
+            ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: PageView.builder(
+                itemBuilder: (context, index) {
+                  return Container(
+                    color: index % 2 == 0 ? Colors.red : Colors.blue,
+                  );
+                },
+                itemCount: 10,
+              ),
+            ),
+            Container(
+              height: 600,
+              color: Colors.white,
+            ),
+          ],
+        ),
       ),
     );
   }
