@@ -400,8 +400,11 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
 
             horizontalEdge = null;
 
-            if (horizontalList.isNotEmpty) {
-              updateEdge(horizontalList.last, event.localPosition);
+            // if (horizontalList.isNotEmpty) {
+            //   updateEdge(horizontalList.last, event.localPosition);
+            // }
+            for (final context in horizontalList) {
+              updateEdge(context, event.localPosition);
             }
           },
           child: RawGestureDetector(
@@ -509,20 +512,30 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
             },
             child: defaultChild,
           ),
-          // Swipeable overlay
-          AnimatedBuilder(
-            animation: _swipeAnimationController,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(
-                  (1 - _swipeAnimationController.value) *
-                      MediaQuery.sizeOf(context).width,
-                  0,
-                ),
-                child: !_swipeOnce ? const SizedBox() : child,
-              );
-            },
-            child: widget.swipeableBuilder!(context),
+          // Swipeable overlay with gesture detector
+          GestureDetector(
+            child: AnimatedBuilder(
+              animation: _swipeAnimationController,
+              builder: (context, child) {
+                return Transform.translate(
+                  offset: Offset(
+                    (1 - _swipeAnimationController.value) *
+                        MediaQuery.sizeOf(context).width,
+                    0,
+                  ),
+                  child: !_swipeOnce
+                      ? const SizedBox()
+                      : child!,
+                );
+              },
+              child: GestureDetector(
+                onHorizontalDragStart: _handleDragStart,
+                onHorizontalDragUpdate: _handleDragUpdate,
+                onHorizontalDragEnd: _handleDragEnd,
+                onHorizontalDragCancel: _handleDragCancel,
+                child: widget.swipeableBuilder!(context),
+              ),
+            ),
           ),
         ],
       );

@@ -15,12 +15,14 @@ class MyApp extends StatelessWidget {
       onGenerateRoute: (settings) {
         return CupertinoRoute(
           builder: (context) => const MyHomePage(),
+          physics: const ClampingScrollPhysics(),
         );
       },
       onGenerateInitialRoutes: (settings) {
         return [
           CupertinoRoute(
             builder: (context) => const MyHomePage(),
+            physics: const ClampingScrollPhysics(),
           )
         ];
       },
@@ -58,6 +60,7 @@ class MyHomePage extends StatelessWidget {
                   context,
                   CupertinoRoute(
                     builder: (context) => const HorizontalListViewScreen(),
+                    physics: const ClampingScrollPhysics(),
                   ),
                 );
               },
@@ -70,6 +73,7 @@ class MyHomePage extends StatelessWidget {
                   context,
                   CupertinoRoute(
                     builder: (context) => const TabBarViewScreen(),
+                    physics: const ClampingScrollPhysics(),
                   ),
                 );
               },
@@ -81,8 +85,23 @@ class MyHomePage extends StatelessWidget {
                 Navigator.push(
                   context,
                   CupertinoRoute(
+                    builder: (context) => const PageViewScreen(),
+                    swipeableBuilder: (context) => const EmptyScreen(),
+                    physics: const ClampingScrollPhysics(),
+                  ),
+                );
+              },
+              child: const Text('Page view'),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  CupertinoRoute(
                     builder: (context) => const HorizontalListViewScreen(),
                     swipeableBuilder: (context) => const EmptyScreen(),
+                    physics: const ClampingScrollPhysics(),
                   ),
                 );
               },
@@ -195,6 +214,41 @@ class EmptyScreen extends StatelessWidget {
     return const Scaffold(
       body: Center(
         child: Text('Empty screen'),
+      ),
+    );
+  }
+}
+
+class PageViewScreen extends StatelessWidget {
+  const PageViewScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              height: 200,
+              color: Colors.black,
+            ),
+            AspectRatio(
+              aspectRatio: 1,
+              child: PageView.builder(
+                itemBuilder: (context, index) {
+                  return Container(
+                    color: index % 2 == 0 ? Colors.red : Colors.blue,
+                  );
+                },
+                itemCount: 10,
+              ),
+            ),
+            Container(
+              height: 600,
+              color: Colors.white,
+            ),
+          ],
+        ),
       ),
     );
   }
