@@ -112,6 +112,7 @@ class BackGestureDetector<T> extends StatefulWidget {
     required this.onStartPopGesture,
     required this.child,
     this.swipeableBuilder,
+    this.physics,
   });
 
   final Widget child;
@@ -121,6 +122,8 @@ class BackGestureDetector<T> extends StatefulWidget {
   final ValueGetter<BackGestureController<T>> onStartPopGesture;
 
   final WidgetBuilder? swipeableBuilder;
+
+  final ScrollPhysics? physics;
 
   @override
   BackGestureDetectorState<T> createState() => BackGestureDetectorState<T>();
@@ -419,37 +422,43 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
                   ..onEnd = _handleDragEnd,
               ),
             },
-            child: NotificationListener<Notification>(
-              onNotification: (notification) {
-                if (notification is ScrollMetricsNotification &&
-                    notification.metrics.axis == Axis.horizontal) {
-                  ScrollableState? findTopMostScrollable(BuildContext context) {
-                    // Find the nearest ScrollableState ancestor
-                    final state =
-                        context.findAncestorStateOfType<ScrollableState>();
+            child: ScrollConfiguration(
+              behavior: widget.physics != null
+                  ? _ScrollBehavior(physics: widget.physics!)
+                  : ScrollConfiguration.of(context),
+              child: NotificationListener<Notification>(
+                onNotification: (notification) {
+                  if (notification is ScrollMetricsNotification &&
+                      notification.metrics.axis == Axis.horizontal) {
+                    ScrollableState? findTopMostScrollable(
+                        BuildContext context) {
+                      // Find the nearest ScrollableState ancestor
+                      final state =
+                          context.findAncestorStateOfType<ScrollableState>();
 
-                    // If no scrollable found, return null
-                    if (state == null) return null;
+                      // If no scrollable found, return null
+                      if (state == null) return null;
 
-                    // If the found scrollable's axis doesn't match the notification's axis,
-                    // keep searching up the tree
-                    if (state.position.axis != Axis.horizontal) {
-                      return findTopMostScrollable(state.context);
+                      // If the found scrollable's axis doesn't match the notification's axis,
+                      // keep searching up the tree
+                      if (state.position.axis != Axis.horizontal) {
+                        return findTopMostScrollable(state.context);
+                      }
+
+                      // Return the found scrollable state
+                      return state;
                     }
 
-                    // Return the found scrollable state
-                    return state;
+                    var scrollable =
+                        findTopMostScrollable(notification.context)?.context;
+                    if (scrollable != null) {
+                      horizontal.add(scrollable);
+                    }
                   }
-
-                  var scrollable =
-                      findTopMostScrollable(notification.context)?.context;
-                  if (scrollable != null) {
-                    horizontal.add(scrollable);
-                  }
-                }
-                return false;
-              },
-              child: _buildChild(),
+                  return false;
+                },
+                child: _buildChild(),
+              ),
             ),
           ),
         ),
@@ -584,5 +593,18 @@ class RouteScrollResolverState extends State<RouteScrollResolver> {
       value: this,
       child: widget.child ?? const SizedBox(),
     );
+  }
+}
+
+class _ScrollBehavior extends ScrollBehavior {
+  const _ScrollBehavior({
+    required this.physics,
+  });
+
+  final ScrollPhysics physics;
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) {
+    return physics;
   }
 }

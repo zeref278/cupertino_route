@@ -18,8 +18,7 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
     super.allowSnapshotting = true,
     super.barrierDismissible = false,
     this.swipeableBuilder,
-    this.isSwipeable = false,
-    this.animationController,
+    this.physics,
   }) {
     assert(opaque);
   }
@@ -27,10 +26,8 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
   /// Builds the primary contents of the route.
   final WidgetBuilder builder;
 
+  /// Builds the swipeable content of the route.
   final WidgetBuilder? swipeableBuilder;
-
-  @override
-  final bool isSwipeable;
 
   @override
   Widget buildContent(BuildContext context) => builder(context);
@@ -38,8 +35,10 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
   @override
   WidgetBuilder? get buildSwipeableContent => swipeableBuilder;
 
+  /// The scroll physics of the route.
   @override
-  final ValueSetter<AnimationController?>? animationController;
+  final ScrollPhysics? physics;
+
   @override
   final String? title;
 

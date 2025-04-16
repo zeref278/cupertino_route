@@ -53,6 +53,7 @@ class _SwipeableRightWrapperState extends State<SwipeableRightWrapper> {
           const SizedBox(),
         PageView.builder(
           controller: _pageController,
+          // hitTestBehavior: HitTestBehavior.deferToChild,
           itemCount: 2,
           itemBuilder: (context, index) {
             if (index == 0) return const SizedBox();
