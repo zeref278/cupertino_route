@@ -10,3 +10,8 @@
 
 - Improved gesture detection system
 - Better integration with existing navigation systems
+
+## [1.0.0] - 2025-04-16
+
+- Improve and fix bugs
+- Swipe builder
