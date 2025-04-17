@@ -15,3 +15,8 @@
 
 - Improve and fix bugs
 - Swipe builder
+
+## [1.1.0] - 2025-04-17
+
+- Event bus
+- Theming
