@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
 
 import 'package:cupertino_route/src/constants/constants.dart';
+import 'package:cupertino_route/src/route/event/event_bus.dart';
+import 'package:cupertino_route/src/theme/cupertino_route_theme.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:cupertino_route/src/route/mono_drag.dart' as mono;
 import 'package:flutter/rendering.dart';
@@ -32,7 +35,7 @@ class BackGestureController<T> {
 
   /// The drag gesture has ended with a horizontal motion of [velocity] as a
   /// fraction of screen width per second.
-  void dragEnd(double velocity) {
+  void dragEnd(double velocity, CupertinoRouteTheme theme) {
     // Fling in the appropriate direction.
     //
     // This curve has been determined through rigorously eyeballing native iOS
@@ -49,13 +52,13 @@ class BackGestureController<T> {
       // pop occurs, the route should still be animated off the screen.
       // See https://github.com/flutter/flutter/issues/141268.
       animateForward = getIsActive();
-    } else if (velocity.abs() >= kMinFlingVelocity) {
+    } else if (velocity.abs() >= theme.minFlingVelocity) {
       // If the user releases the page before mid screen with sufficient velocity,
       // or after mid screen, we should animate the page out. Otherwise, the page
       // should be animated back in.
       animateForward = velocity <= 0;
     } else {
-      animateForward = controller.value > 0.5;
+      animateForward = controller.value > (1 - theme.backThreshold);
     }
 
     if (animateForward) {
@@ -113,6 +116,9 @@ class BackGestureDetector<T> extends StatefulWidget {
     required this.child,
     this.swipeableBuilder,
     this.physics,
+    this.enableEventBus = false,
+    required this.routeHashCode,
+    this.theme,
   });
 
   final Widget child;
@@ -124,6 +130,12 @@ class BackGestureDetector<T> extends StatefulWidget {
   final WidgetBuilder? swipeableBuilder;
 
   final ScrollPhysics? physics;
+
+  final bool enableEventBus;
+
+  final int routeHashCode;
+
+  final CupertinoRouteTheme? theme;
 
   @override
   BackGestureDetectorState<T> createState() => BackGestureDetectorState<T>();
@@ -148,7 +160,14 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
 
   late final AnimationController? _swipeAnimationController;
 
+  StreamSubscription? _swipeSubscription;
+
+  Animation<Offset>? _parallaxAnimation;
+
   bool _swipeOnce = false;
+
+  CupertinoRouteTheme get theme =>
+      widget.theme ?? CupertinoRouteTheme.of(context);
 
   @override
   void initState() {
@@ -163,6 +182,26 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
       _swipeAnimationController = null;
     }
 
+    if (isSwipeable && widget.enableEventBus) {
+      _swipeSubscription =
+          CupertinoRouteEventBus.on<ChangeSwipeStateEvent>().listen(
+        (event) {
+          if (mounted) {
+            final valid = event.routeHashCode == widget.routeHashCode;
+            if (valid && event.open) {
+              _swipeAnimationController?.animateTo(1);
+              _swipeState = SwipeState.open;
+              _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
+            } else if (valid) {
+              _swipeAnimationController?.animateTo(0);
+              _offset = Offset.zero;
+              _swipeState = SwipeState.close;
+            }
+          }
+        },
+      );
+    }
+
     _recognizer = mono.HorizontalDragGestureRecognizer(debugOwner: this)
       ..onStart = _handleDragStart
       ..onUpdate = _handleDragUpdate
@@ -171,7 +210,20 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (isSwipeable && _parallaxAnimation == null) {
+      _parallaxAnimation = Tween<Offset>(
+        begin: Offset.zero,
+        end: Offset(-theme.swipeParallaxScale, 0.0),
+      ).animate(_swipeAnimationController!);
+    }
+  }
+
+  @override
   void dispose() {
+    _swipeSubscription?.cancel();
+    _swipeSubscription = null;
     _recognizer.dispose();
 
     // If this is disposed during a drag, call navigator.didStopUserGesture.
@@ -228,14 +280,19 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
     if (_backGestureController == null) return;
     assert(_backGestureController != null);
     if (swipeAnimationValue == 0 || !isSwipeable) {
-      _backGestureController!.dragEnd(_convertToLogical(
-          details.velocity.pixelsPerSecond.dx / context.size!.width));
+      _backGestureController!.dragEnd(
+        _convertToLogical(
+          details.velocity.pixelsPerSecond.dx / context.size!.width,
+        ),
+        theme,
+      );
     } else {
       final velocity = _convertToLogical(
           details.velocity.pixelsPerSecond.dx / context.size!.width);
       if (_swipeState == SwipeState.open) {
         /// Opening
-        if (swipeAnimationValue < 0.5 || velocity > 2) {
+        if (swipeAnimationValue < (1 - theme.swipeThreshold) ||
+            velocity > theme.minFlingVelocity) {
           _offset = Offset.zero;
           _swipeAnimationController?.animateTo(0);
           _swipeState = SwipeState.close;
@@ -243,10 +300,20 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
           _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
           _swipeAnimationController?.animateTo(1);
           _swipeState = SwipeState.open;
+        }
+
+        if (widget.enableEventBus) {
+          CupertinoRouteEventBus.emit(
+            SwipeStateChangedEvent(
+              swipeState: _swipeState,
+              routeHashCode: widget.routeHashCode,
+            ),
+          );
         }
       } else {
         /// Closing
-        if (swipeAnimationValue > 0.5 || velocity < -2) {
+        if (swipeAnimationValue > theme.swipeThreshold ||
+            velocity < -theme.minFlingVelocity) {
           _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
           _swipeAnimationController?.animateTo(1);
           _swipeState = SwipeState.open;
@@ -255,9 +322,18 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
           _swipeAnimationController?.animateTo(0);
           _swipeState = SwipeState.close;
         }
+
+        if (widget.enableEventBus) {
+          CupertinoRouteEventBus.emit(
+            SwipeStateChangedEvent(
+              swipeState: _swipeState,
+              routeHashCode: widget.routeHashCode,
+            ),
+          );
+        }
       }
 
-      _backGestureController!.dragEnd(0);
+      _backGestureController!.dragEnd(0, theme);
     }
     _backGestureController = null;
   }
@@ -269,11 +345,11 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
     // This can be called even if start is not called, paired with the "down" event
     // that we don't consider here.
     if (swipeAnimationValue == 0 || !isSwipeable) {
-      _backGestureController?.dragEnd(0.0);
+      _backGestureController?.dragEnd(0.0, theme);
     } else {
       if (_swipeState == SwipeState.open) {
         /// Opening
-        if (swipeAnimationValue < 0.5) {
+        if (swipeAnimationValue < (1 - theme.swipeThreshold)) {
           _offset = Offset.zero;
           _swipeAnimationController?.animateTo(0);
           _swipeState = SwipeState.close;
@@ -281,10 +357,19 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
           _offset = Offset(-MediaQuery.sizeOf(context).width, 0);
           _swipeAnimationController?.animateTo(1);
           _swipeState = SwipeState.open;
+        }
+
+        if (widget.enableEventBus) {
+          CupertinoRouteEventBus.emit(
+            SwipeStateChangedEvent(
+              swipeState: _swipeState,
+              routeHashCode: widget.routeHashCode,
+            ),
+          );
         }
       } else {
         /// Closing
-        if (swipeAnimationValue < 0.5) {
+        if (swipeAnimationValue < theme.swipeThreshold) {
           _offset = Offset.zero;
           _swipeAnimationController?.animateTo(0);
           _swipeState = SwipeState.close;
@@ -293,9 +378,18 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
           _swipeAnimationController?.animateTo(1);
           _swipeState = SwipeState.open;
         }
+
+        if (widget.enableEventBus) {
+          CupertinoRouteEventBus.emit(
+            SwipeStateChangedEvent(
+              swipeState: _swipeState,
+              routeHashCode: widget.routeHashCode,
+            ),
+          );
+        }
       }
 
-      _backGestureController?.dragEnd(0);
+      _backGestureController?.dragEnd(0, theme);
     }
     _backGestureController = null;
   }
@@ -481,7 +575,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
         widget.child,
         PositionedDirectional(
           start: 0.0,
-          width: max(dragAreaWidth, kBackGestureWidth),
+          width: max(dragAreaWidth, theme.backGestureWidth),
           top: 0.0,
           bottom: 0.0,
           child: Listener(
@@ -500,10 +594,11 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
             animation: _swipeAnimationController!,
             builder: (context, child) {
               return Transform.translate(
-                offset: Offset(
-                  -(_swipeAnimationController.value) * 100,
-                  0,
-                ),
+                offset: _parallaxAnimation?.value.scale(
+                      MediaQuery.sizeOf(context).width,
+                      0,
+                    ) ??
+                    Offset.zero,
                 child: IgnorePointer(
                   ignoring: _swipeAnimationController.value != 0,
                   child: child,
@@ -517,15 +612,18 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
             child: AnimatedBuilder(
               animation: _swipeAnimationController,
               builder: (context, child) {
-                return Transform.translate(
-                  offset: Offset(
-                    (1 - _swipeAnimationController.value) *
-                        MediaQuery.sizeOf(context).width,
-                    0,
+                return ColoredBox(
+                  color: const Color(0xFF000000).withOpacity(
+                    _swipeAnimationController.value * 0.2,
                   ),
-                  child: !_swipeOnce
-                      ? const SizedBox()
-                      : child!,
+                  child: Transform.translate(
+                    offset: Offset(
+                      (1 - _swipeAnimationController.value) *
+                          MediaQuery.sizeOf(context).width,
+                      0,
+                    ),
+                    child: !_swipeOnce ? const SizedBox() : child!,
+                  ),
                 );
               },
               child: GestureDetector(

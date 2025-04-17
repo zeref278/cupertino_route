@@ -1,6 +1,7 @@
 library;
 
 import 'package:cupertino_route/src/route/transition_mixin.dart';
+import 'package:cupertino_route/src/theme/cupertino_route_theme.dart';
 import 'package:flutter/cupertino.dart';
 
 /// A Cupertino-style route that supports dragging from anywhere on the screen to navigate back.
@@ -19,6 +20,8 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
     super.barrierDismissible = false,
     this.swipeableBuilder,
     this.physics,
+    this.enableEventBus = false,
+    this.theme,
   }) {
     assert(opaque);
   }
@@ -44,6 +47,16 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
 
   @override
   final bool maintainState;
+
+  /// Whether to enable the event bus (emit events when the route swipes and listens for events).
+  @override
+  final bool enableEventBus;
+
+  /// The theme of the route.
+  ///
+  /// If not provided, the theme will be the default theme.
+  @override
+  final CupertinoRouteTheme? theme;
 
   @override
   String get debugLabel => '${super.debugLabel}(${settings.name})';

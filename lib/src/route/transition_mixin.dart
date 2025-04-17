@@ -1,5 +1,6 @@
 import 'package:cupertino_route/src/route/back_gesture.dart';
 import 'package:cupertino_route/src/constants/constants.dart';
+import 'package:cupertino_route/src/theme/cupertino_route_theme.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,12 @@ mixin TransitionMixin<T> on PageRoute<T> {
   /// Builds the swipeable contents of the route.
   @protected
   WidgetBuilder? buildSwipeableContent;
+
+  @protected
+  bool get enableEventBus;
+
+  @protected
+  CupertinoRouteTheme? get theme;
 
   String? get title;
 
@@ -136,6 +143,9 @@ mixin TransitionMixin<T> on PageRoute<T> {
           onStartPopGesture: () => _startPopGesture<T>(route),
           swipeableBuilder: buildSwipeableContent,
           physics: physics,
+          enableEventBus: enableEventBus,
+          routeHashCode: route.hashCode,
+          theme: theme,
           child: child,
         ),
       );
