@@ -242,7 +242,6 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
     assert(mounted);
     if (!widget.enabledCallback()) return;
     assert(_backGestureController == null);
-
     _backGestureController = widget.onStartPopGesture();
   }
 
@@ -608,31 +607,36 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
             child: defaultChild,
           ),
           // Swipeable overlay with gesture detector
-          GestureDetector(
-            child: AnimatedBuilder(
-              animation: _swipeAnimationController,
-              builder: (context, child) {
-                return ColoredBox(
-                  color: const Color(0xFF000000).withOpacity(
-                    _swipeAnimationController.value * 0.2,
+          AnimatedBuilder(
+            animation: _swipeAnimationController,
+            builder: (context, child) {
+              return ColoredBox(
+                color: const Color(0xFF000000).withOpacity(
+                  _swipeAnimationController.value * 0.2,
+                ),
+                child: Transform.translate(
+                  offset: Offset(
+                    (1 - _swipeAnimationController.value) *
+                        MediaQuery.sizeOf(context).width,
+                    0,
                   ),
-                  child: Transform.translate(
-                    offset: Offset(
-                      (1 - _swipeAnimationController.value) *
-                          MediaQuery.sizeOf(context).width,
-                      0,
-                    ),
-                    child: !_swipeOnce ? const SizedBox() : child!,
-                  ),
-                );
-              },
-              child: GestureDetector(
-                onHorizontalDragStart: _handleDragStart,
-                onHorizontalDragUpdate: _handleDragUpdate,
-                onHorizontalDragEnd: _handleDragEnd,
-                onHorizontalDragCancel: _handleDragCancel,
-                child: widget.swipeableBuilder!(context),
-              ),
+                  child: !_swipeOnce
+                      ? const SizedBox()
+                      : SizedBox(
+                          width: _swipeAnimationController.value == 0
+                              ? 0
+                              : MediaQuery.sizeOf(context).width,
+                          child: child!,
+                        ),
+                ),
+              );
+            },
+            child: GestureDetector(
+              onHorizontalDragStart: _handleDragStart,
+              onHorizontalDragUpdate: _handleDragUpdate,
+              onHorizontalDragEnd: _handleDragEnd,
+              onHorizontalDragCancel: _handleDragCancel,
+              child: widget.swipeableBuilder!(context),
             ),
           ),
         ],
