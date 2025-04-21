@@ -22,6 +22,7 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
     this.physics,
     this.enableEventBus = false,
     this.theme,
+    this.enableGesture = true,
   }) {
     assert(opaque);
   }
@@ -51,6 +52,12 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
   /// Whether to enable the event bus (emit events when the route swipes and listens for events).
   @override
   final bool enableEventBus;
+
+  /// Whether to enable the back/swipe gesture.
+  ///
+  /// If not provided, the back gesture will be enabled.
+  @override
+  final bool enableGesture;
 
   /// The theme of the route.
   ///

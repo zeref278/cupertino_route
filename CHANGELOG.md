@@ -20,3 +20,12 @@
 
 - Event bus
 - Theming
+
+## [1.1.1] - 2025-04-18
+
+- Fix bug swipe
+
+
+## [1.2.0] - 2025-04-21
+
+- Enable/disable gesture

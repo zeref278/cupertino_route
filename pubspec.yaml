@@ -1,6 +1,6 @@
 name: cupertino_route
 description: "A Flutter package that provides a draggable anywhere page route."
-version: 1.1.0
+version: 1.2.0
 homepage: https://github.com/zeref278/cupertino_route
 
 environment:

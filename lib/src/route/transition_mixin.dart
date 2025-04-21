@@ -18,6 +18,9 @@ mixin TransitionMixin<T> on PageRoute<T> {
   bool get enableEventBus;
 
   @protected
+  bool get enableGesture;
+
+  @protected
   CupertinoRouteTheme? get theme;
 
   String? get title;
@@ -68,6 +71,8 @@ mixin TransitionMixin<T> on PageRoute<T> {
     // Don't perform outgoing animation if the next route is a fullscreen dialog.
     return (nextRoute is TransitionMixin && !nextRoute.fullscreenDialog) ||
         (nextRoute is CupertinoRouteTransitionMixin &&
+            !nextRoute.fullscreenDialog) ||
+        (nextRoute is MaterialRouteTransitionMixin &&
             !nextRoute.fullscreenDialog);
   }
 
@@ -138,16 +143,18 @@ mixin TransitionMixin<T> on PageRoute<T> {
         primaryRouteAnimation: animation,
         secondaryRouteAnimation: secondaryAnimation,
         linearTransition: linearTransition,
-        child: BackGestureDetector<T>(
-          enabledCallback: () => route.popGestureEnabled,
-          onStartPopGesture: () => _startPopGesture<T>(route),
-          swipeableBuilder: buildSwipeableContent,
-          physics: physics,
-          enableEventBus: enableEventBus,
-          routeHashCode: route.hashCode,
-          theme: theme,
-          child: child,
-        ),
+        child: enableGesture
+            ? BackGestureDetector<T>(
+                enabledCallback: () => route.popGestureEnabled,
+                onStartPopGesture: () => _startPopGesture<T>(route),
+                swipeableBuilder: buildSwipeableContent,
+                physics: physics,
+                enableEventBus: enableEventBus,
+                routeHashCode: route.hashCode,
+                theme: theme,
+                child: child,
+              )
+            : child,
       );
     }
   }
