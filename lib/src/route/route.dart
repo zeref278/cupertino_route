@@ -23,6 +23,7 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
     this.enableEventBus = false,
     this.theme,
     this.enableGesture = true,
+    this.childHasGesture = false,
   }) {
     assert(opaque);
   }
@@ -64,6 +65,9 @@ class CupertinoRoute<T> extends PageRoute<T> with TransitionMixin<T> {
   /// If not provided, the theme will be the default theme.
   @override
   final CupertinoRouteTheme? theme;
+
+  @override
+  final bool childHasGesture;
 
   @override
   String get debugLabel => '${super.debugLabel}(${settings.name})';

@@ -15,6 +15,9 @@ mixin TransitionMixin<T> on PageRoute<T> {
   WidgetBuilder? buildSwipeableContent;
 
   @protected
+  bool get childHasGesture;
+
+  @protected
   bool get enableEventBus;
 
   @protected
@@ -152,6 +155,7 @@ mixin TransitionMixin<T> on PageRoute<T> {
                 enableEventBus: enableEventBus,
                 routeHashCode: route.hashCode,
                 theme: theme,
+                childHasGesture: childHasGesture,
                 child: child,
               )
             : child,

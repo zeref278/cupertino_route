@@ -119,11 +119,14 @@ class BackGestureDetector<T> extends StatefulWidget {
     this.enableEventBus = false,
     required this.routeHashCode,
     this.theme,
+    this.childHasGesture = false,
   });
 
   final Widget child;
 
   final ValueGetter<bool> enabledCallback;
+
+  final bool childHasGesture;
 
   final ValueGetter<BackGestureController<T>> onStartPopGesture;
 
@@ -501,6 +504,8 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
             }
           },
           child: RawGestureDetector(
+            behavior:
+                widget.childHasGesture ? HitTestBehavior.deferToChild : null,
             gestures: {
               _PanGestureRecognizer:
                   GestureRecognizerFactoryWithHandlers<_PanGestureRecognizer>(
@@ -510,6 +515,7 @@ class BackGestureDetectorState<T> extends State<BackGestureDetector<T>>
                   4,
                   300,
                   widget.enabledCallback,
+                  widget.childHasGesture,
                 ),
                 (instance) => instance //
                   ..onStart = _handleDragStart
@@ -654,12 +660,15 @@ class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
   final double edgeSlop;
   final double defaultSlop;
 
+  final bool childHasGesture;
+
   _PanGestureRecognizer(
     this.horizontalEdge,
     this.verticalEdge,
     this.edgeSlop,
     this.defaultSlop,
     this.enabledCallback,
+    this.childHasGesture,
   );
 
   @override
@@ -676,6 +685,10 @@ class _PanGestureRecognizer extends mono.HorizontalDragGestureRecognizer {
       null => edgeSlop,
       _ => defaultSlop,
     };
+
+    if (horizontalEdge() == null && childHasGesture) {
+      return delta.dx.abs() > defaultSlop;
+    }
 
     return delta.dx.abs() > xSlop && delta.dy.abs() < 10;
   }
